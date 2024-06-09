@@ -15,9 +15,11 @@
 enum hero_type_id {
     hero_type_knight,
     hero_type_archer,
+    hero_type_mage,
     hero_type_count
 };
-enum hero_type_id hero_attack_order[hero_type_count] = {hero_type_knight, hero_type_archer};
+enum hero_type_id hero_attack_order[hero_type_count] = {hero_type_knight, hero_type_archer,
+                                                        hero_type_mage};
 struct hero_type;
 struct hero {
     struct hero_type *type;
@@ -105,6 +107,14 @@ void archer_attack(struct hero *hero, struct player *attacker, struct player *de
     } else defender->hp -= hero_getDamageCrown(hero);
 }
 
+void mage_attack(struct hero *hero, struct player *attacker, struct player *defender) {
+    if (defender->wall > 0) {
+        defender->wall -= hero_getDamageWall(hero);
+    } else defender->hp -= hero_getDamageCrown(hero);
+    // Double attack
+    defender->hp -= hero_getDamageCrown(hero);
+}
+
 /**
  * Has to be called before the game can work
  */
@@ -124,6 +134,13 @@ void wheels_init() {
             .damageCrown = {3, 4, 6},
             .damageWall = {1, 2, 3},
             .attack = archer_attack
+    };
+    hero_types[hero_type_mage] = (struct hero_type) {
+            .id = hero_type_mage,
+            .maxEnergy = {5, 4, 4},
+            .damageCrown = {3, 3, 3},
+            .damageWall = {1, 3, 5},
+            .attack = mage_attack
     };
 }
 
