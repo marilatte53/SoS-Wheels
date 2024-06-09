@@ -8,9 +8,8 @@ actual game to work.
 
 ## TODO List
 
-- Put hero base stats in hero_info
-- Change Hero stats depending on tier
-- Hero selection menu
-- Mage
-- Improve user input, give feedback to user
-- Help menu
+- [X] Change Hero stats depending on tier
+- [ ] Hero selection menu
+- [ ] Mage
+- [ ] Improve user input, give feedback to user
+- [ ] Help menu

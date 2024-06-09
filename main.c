@@ -8,31 +8,24 @@
 #define WHEEL_BRONZE_SIDES 11
 
 #define HERO_XP_MAX 6
-#define HERO_TIER_MAX 3
+#define HERO_TIERS_COUNT 3
 
 #define BITS_SET(N, M) (((N) & (M)) == (M))
 
-// TODO: move hero base stats to hero type
-enum hero_type {
+#define HERO_TYPE_COUNT 2
+
+enum hero_type_id {
     hero_type_knight,
     hero_type_archer,
     hero_type_count
 };
-enum hero_type hero_attack_order[] = {hero_type_knight, hero_type_archer};
-struct player;
-
+enum hero_type_id hero_attack_order[HERO_TYPE_COUNT] = {hero_type_knight, hero_type_archer};
+struct hero_type;
 struct hero {
-    enum hero_type type; // indicates which hero
+    struct hero_type *type;
     int energy;
     int xp;
     int tier;
-
-    void (*attack)(struct hero *hero, struct player *attacker, struct player *defender);
-
-    // TODO: stats increase with tier
-    int maxEnergy;
-    int damageCrown;
-    int damageWall;
 };
 
 #define SIDE_XP_MASK (1 << 2)
@@ -43,6 +36,7 @@ struct hero {
 #define SIDE_HAMMER_MASK (1 << 5)
 #define SIDE_HAMMER_VALUE_MASK 3
 
+// TODO: use union or something
 enum wheel_side {
     wheel_side_empty = 0,
     diamond1 = SIDE_DIAMOND_MASK + 1,
@@ -61,6 +55,7 @@ enum wheel_side bronze_wheel[11] = {wheel_side_empty, diamond1, diamond2, diamon
                                     square2,
                                     square1xp, square2xp, hammer1, hammer2};
 
+// TODO: Either move everything into game struct or global variables
 struct wheels_game {
     int player_turn;
 } game;
@@ -73,38 +68,71 @@ struct player {
     int wheel[5];
 } player1, player2;
 
-void initHero(struct hero *hero) {
-    hero->energy = hero->maxEnergy;
-    hero->tier = 1;
-    hero->xp = 0;
+struct hero_type {
+    enum hero_type_id id;
+    int maxEnergy[HERO_TIERS_COUNT];
+    int damageCrown[HERO_TIERS_COUNT];
+    int damageWall[HERO_TIERS_COUNT];
+
+    void (*attack)(struct hero *hero, struct player *attacker, struct player *defender);
+};
+
+int hero_getDamageWall(struct hero *hero) {
+    return hero->type->damageWall[hero->tier];
 }
+
+int hero_getDamageCrown(struct hero *hero) {
+    return hero->type->damageCrown[hero->tier];
+}
+
+int hero_getMaxEnergy(struct hero *hero) {
+    return hero->type->maxEnergy[hero->tier];
+}
+
+void hero_attack(struct hero *hero, struct player *attacker, struct player *defender) {
+    hero->type->attack(hero, attacker, defender);
+}
+
+struct hero_type hero_types[HERO_TYPE_COUNT];
 
 void knight_attack(struct hero *hero, struct player *attacker, struct player *defender) {
     if (defender->wall > 0) {
-        defender->wall -= hero->damageWall;
-    } else defender->hp -= hero->damageCrown;
-}
-
-void initKnight(struct hero *knight) {
-    knight->type = hero_type_knight;
-    knight->damageWall = 3;
-    knight->damageCrown = 3;
-    knight->maxEnergy = 3;
-    knight->attack = knight_attack;
+        defender->wall -= hero_getDamageWall(hero);
+    } else defender->hp -= hero_getDamageCrown(hero);
 }
 
 void archer_attack(struct hero *hero, struct player *attacker, struct player *defender) {
     if (defender->wall > 2) {
-        defender->wall -= hero->damageWall;
-    } else defender->hp -= hero->damageCrown;
+        defender->wall -= hero_getDamageWall(hero);
+    } else defender->hp -= hero_getDamageCrown(hero);
 }
 
-void initArcher(struct hero *archer) {
-    archer->type = hero_type_archer;
-    archer->damageWall = 1;
-    archer->damageCrown = 3;
-    archer->maxEnergy = 4;
-    archer->attack = archer_attack;
+/**
+ * Has to be called before the game can work
+ */
+void wheels_init() {
+    // For RNG
+    srand(time(NULL));
+    hero_types[hero_type_knight] = (struct hero_type) {
+            .id = hero_type_knight,
+            .maxEnergy = {3, 3, 3},
+            .damageCrown = {3, 5, 7},
+            .damageWall = {3, 5, 5},
+            .attack = knight_attack
+    };
+    hero_types[hero_type_archer] = (struct hero_type) {
+            .id = hero_type_archer,
+            .maxEnergy = {4, 3, 3},
+            .damageCrown = {3, 4, 6},
+            .damageWall = {1, 2, 3},
+            .attack = archer_attack
+    };
+}
+
+void initHero(struct hero *hero) {
+    hero->energy = hero->type->maxEnergy[0];
+    hero->tier = 0;
+    hero->xp = 0;
 }
 
 void reset() {
@@ -112,20 +140,15 @@ void reset() {
     player1.wall = 0;
     // player1.wheel should be all zero
 
-    initKnight(&player1.hero1);
-    initArcher(&player1.hero2);
-    initHero(&player1.hero1);
-    initHero(&player1.hero2);
-
     // Copy player 1
     player2 = player1;
 }
 
-int getWheelSide(int slot) {
+int getWheelSideValue(int slot) {
     return slot & ((1 << 30) - 1);
 }
 
-void formatWheelLock(char buf[14], int wheel[5]) {
+void formatWheelLock(char buf[14], const int wheel[5]) {
     for (int i = 0; i < 5; i++) {
         char *bufIndex = buf + 3 * i;
         if (wheel[i] & (1 << 30)) {
@@ -137,7 +160,7 @@ void formatWheelLock(char buf[14], int wheel[5]) {
 void formatWheelSlots(char buf[14], int wheel[5]) {
     for (int i = 0; i < 5; i++) {
         char *slot = buf + 3 * i;
-        int side = getWheelSide(wheel[i]);
+        int side = getWheelSideValue(wheel[i]);
         if (side == wheel_side_empty) {
             memcpy(slot, "--", 2);
         } else if (BITS_SET(side, SIDE_DIAMOND_MASK)) {
@@ -157,6 +180,7 @@ void formatWheelSlots(char buf[14], int wheel[5]) {
     }
 }
 
+// TODO: Hero names
 void printStatus() {
     char centerStrBuf[15];
     memset(centerStrBuf, ' ', 14);
@@ -166,48 +190,50 @@ void printStatus() {
     if (game.player_turn == 2)
         printf("*");
     printf("\n");
-    printf("     Hero  %d      ", player2.hero1.type);
+    printf("     Hero  %d      ", player2.hero1.type->id);
     formatWheelSlots(centerStrBuf, player2.wheel);
     printf("%s", centerStrBuf);
-    printf("      %d  Hero\n", player2.hero2.type);
+    printf("      %d  Hero\n", player2.hero2.type->id);
 
-    printf("   Energy %d/%d     ", player2.hero1.energy, player2.hero1.maxEnergy);
+    printf("   Energy %d/%d     ", player2.hero1.energy, hero_getMaxEnergy(&player2.hero1));
     memset(centerStrBuf, ' ', 14);
     formatWheelLock(centerStrBuf, player2.wheel);
     printf("%s", centerStrBuf);
-    printf("     %d/%d Energy\n", player2.hero2.energy, player2.hero2.maxEnergy);
+    printf("     %d/%d Energy\n", player2.hero2.energy, hero_getMaxEnergy(&player2.hero2));
 
-    printf("     Tier %d/%d     Health      %02d     %d/%d Tier\n", player2.hero1.tier,
-           HERO_TIER_MAX, player2.hp, player2.hero2.tier, HERO_TIER_MAX);
+    printf("     Tier %d/%d     Health      %02d     %d/%d Tier\n", player2.hero1.tier + 1,
+           HERO_TIERS_COUNT, player2.hp, player2.hero2.tier + 1, HERO_TIERS_COUNT);
 
     printf("       XP %d/%d                        %d/%d XP\n", player2.hero1.xp, HERO_XP_MAX,
            player2.hero2.xp, HERO_XP_MAX);
 
-    printf("    Crown  %d      Wall         %d      %d  Crown\n", player2.hero1.damageCrown,
-           player2.wall, player2.hero2.damageCrown);
+    printf("    Crown  %d      Wall         %d      %d  Crown\n",
+           hero_getDamageCrown(&player2.hero1),
+           player2.wall, hero_getDamageCrown(&player2.hero2));
 
-    printf("     Wall  %d                          %d  Wall\n", player2.hero1.damageWall,
-           player2.hero2.damageWall);
+    printf("     Wall  %d                          %d  Wall\n", hero_getDamageWall(&player2.hero1),
+           hero_getDamageWall(&player2.hero2));
     printf("\n");
     // Player 1
-    printf("     Wall  %d                          %d  Wall\n", player1.hero1.damageWall,
-           player1.hero2.damageWall);
-    printf("    Crown  %d      Wall         %d      %d  Crown\n", player1.hero1.damageCrown,
-           player1.wall, player1.hero2.damageCrown);
+    printf("     Wall  %d                          %d  Wall\n", hero_getDamageWall(&player1.hero1),
+           hero_getDamageWall(&player1.hero2));
+    printf("    Crown  %d      Wall         %d      %d  Crown\n",
+           hero_getDamageCrown(&player1.hero1),
+           player1.wall, hero_getDamageCrown(&player1.hero2));
     printf("       XP %d/%d                        %d/%d XP\n", player1.hero1.xp, HERO_XP_MAX,
            player1.hero2.xp, HERO_XP_MAX);
     printf("     Tier %d/%d     Health      %02d     %d/%d Tier\n", player1.hero1.tier,
-           HERO_TIER_MAX, player1.hp, player1.hero2.tier, HERO_TIER_MAX);
-    printf("   Energy %d/%d     ", player1.hero1.energy, player1.hero1.maxEnergy);
+           HERO_TIERS_COUNT, player1.hp, player1.hero2.tier, HERO_TIERS_COUNT);
+    printf("   Energy %d/%d     ", player1.hero1.energy, hero_getMaxEnergy(&player1.hero1));
     memset(centerStrBuf, ' ', 14);
     formatWheelLock(centerStrBuf, player1.wheel);
     printf("%s", centerStrBuf);
-    printf("     %d/%d Energy\n", player1.hero2.energy, player1.hero2.maxEnergy);
-    printf("     Hero  %d      ", player1.hero1.type);
+    printf("     %d/%d Energy\n", player1.hero2.energy, hero_getMaxEnergy(&player1.hero2));
+    printf("     Hero  %d      ", player1.hero1.type->id);
     memset(centerStrBuf, ' ', 14);
     formatWheelSlots(centerStrBuf, player1.wheel);
     printf("%s", centerStrBuf);
-    printf("      %d  Hero\n", player1.hero2.type);
+    printf("      %d  Hero\n", player1.hero2.type->id);
     printf("                     Player 1");
     if (game.player_turn == 1)
         printf("*");
@@ -265,6 +291,7 @@ int handlePlayerTurn(int wheel[5]) {
     return 0;
 }
 
+// TODO: check for max energy and decrease if needed
 void updateHeroTier(struct hero *hero) {
     if (hero->xp >= HERO_XP_MAX && hero->tier < 3) {
         hero->tier++;
@@ -280,7 +307,7 @@ void updateHeroTiers(struct player *player) {
 void assignWheelXp(struct player *player) {
     int diamondXp = 0, squareXp = 0;
     for (size_t i = 0; i < 5; i++) {
-        int side = getWheelSide(player->wheel[i]);
+        int side = getWheelSideValue(player->wheel[i]);
         if (!BITS_SET(side, SIDE_XP_MASK))
             continue;
         if (BITS_SET(side, SIDE_DIAMOND_MASK))
@@ -295,7 +322,7 @@ void assignWheelXp(struct player *player) {
 void buildWall(struct player *player) {
     int hammers = 0;
     for (size_t i = 0; i < 5; i++) {
-        int side = getWheelSide(player->wheel[i]);
+        int side = getWheelSideValue(player->wheel[i]);
         if (BITS_SET(side, SIDE_HAMMER_MASK))
             hammers += side & SIDE_HAMMER_VALUE_MASK;
     }
@@ -308,29 +335,30 @@ void buildWall(struct player *player) {
 void assignHeroEnergy(struct player *player) {
     int diamondEnergy = 0, squareEnergy = 0;
     for (size_t i = 0; i < 5; i++) {
-        int side = getWheelSide(player->wheel[i]);
+        int side = getWheelSideValue(player->wheel[i]);
         if (BITS_SET(side, SIDE_DIAMOND_MASK))
             diamondEnergy += side & SIDE_DIAMOND_VALUE_MASK;
         else if (BITS_SET(side, SIDE_SQUARE_MASK))
             squareEnergy += side & SIDE_SQUARE_VALUE_MASK;
     }
-    if(squareEnergy > 2)
+    if (squareEnergy > 2)
         player->hero1.energy -= (squareEnergy - 2);
-    if(diamondEnergy > 2)
+    if (diamondEnergy > 2)
         player->hero2.energy -= (diamondEnergy - 2);
 }
 
-void tryHeroAttack(struct hero *hero, struct player *attacker, struct player *defender, int type) {
-    if (hero->type != type)
+void tryHeroAttack(struct hero *hero, struct player *attacker, struct player *defender,
+                   enum hero_type_id typeId) {
+    if (hero->type->id != typeId)
         return;
     // Regular attack
     if (hero->energy <= 0) {
-        hero->attack(hero, attacker, defender);
-        hero->energy = hero->maxEnergy;
+        hero_attack(hero, attacker, defender);
+        hero->energy = hero_getMaxEnergy(hero);
         hero->xp += 2;
     }
     // Bomb attack
-    if (hero->xp >= HERO_XP_MAX && hero->tier == HERO_TIER_MAX) {
+    if (hero->xp >= HERO_XP_MAX && hero->tier == HERO_TIERS_COUNT) {
         defender->hp -= 2;
         hero->xp = 0;
     }
@@ -345,11 +373,11 @@ void fixPlayerStats(struct player *player) {
 
 void handleAttacks() {
     for (size_t i = 0; i < hero_type_count; i++) {
-        enum hero_type type = hero_attack_order[i];
-        tryHeroAttack(&player1.hero1, &player1, &player2, type);
-        tryHeroAttack(&player1.hero2, &player1, &player2, type);
-        tryHeroAttack(&player2.hero1, &player2, &player1, type);
-        tryHeroAttack(&player2.hero2, &player2, &player1, type);
+        enum hero_type_id typeId = hero_attack_order[i];
+        tryHeroAttack(&player1.hero1, &player1, &player2, typeId);
+        tryHeroAttack(&player1.hero2, &player1, &player2, typeId);
+        tryHeroAttack(&player2.hero1, &player2, &player1, typeId);
+        tryHeroAttack(&player2.hero2, &player2, &player1, typeId);
     }
 
     // Fix stats
@@ -418,8 +446,17 @@ int runGameLoop() {
     return 0;
 }
 
+void handleHeroSelection(struct player *player) {
+    player->hero1.type = &hero_types[hero_type_knight];
+    player->hero2.type = &hero_types[hero_type_archer];
+    initHero(&player->hero1);
+    initHero(&player->hero2);
+}
+
 int main() {
-    srand(time(NULL));
+    wheels_init();
     reset();
+    handleHeroSelection(&player1);
+    handleHeroSelection(&player2);
     return runGameLoop();
 }
