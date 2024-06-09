@@ -9,7 +9,7 @@ actual game to work.
 ## TODO List
 
 - [X] Change Hero stats depending on tier
-- [ ] Hero selection menu
+- [X] Hero selection menu
 - [ ] Mage
 - [ ] Improve user input, give feedback to user
 - [ ] Help menu

@@ -12,14 +12,12 @@
 
 #define BITS_SET(N, M) (((N) & (M)) == (M))
 
-#define HERO_TYPE_COUNT 2
-
 enum hero_type_id {
     hero_type_knight,
     hero_type_archer,
     hero_type_count
 };
-enum hero_type_id hero_attack_order[HERO_TYPE_COUNT] = {hero_type_knight, hero_type_archer};
+enum hero_type_id hero_attack_order[hero_type_count] = {hero_type_knight, hero_type_archer};
 struct hero_type;
 struct hero {
     struct hero_type *type;
@@ -93,7 +91,7 @@ void hero_attack(struct hero *hero, struct player *attacker, struct player *defe
     hero->type->attack(hero, attacker, defender);
 }
 
-struct hero_type hero_types[HERO_TYPE_COUNT];
+struct hero_type hero_types[hero_type_count];
 
 void knight_attack(struct hero *hero, struct player *attacker, struct player *defender) {
     if (defender->wall > 0) {
@@ -446,9 +444,32 @@ int runGameLoop() {
     return 0;
 }
 
+int selectHero(int excludeId) {
+    do {
+        for (int i = 0; i < hero_type_count; i++) {
+            if (excludeId != hero_types[i].id)
+                printf("%d ", hero_types[i].id);
+        }
+        printf("\nSelect a hero\n>");
+        char choice = getchar();
+        getchar();
+        printf("\n");
+        int selection = choice - '0';
+        if (selection < 0 || selection >= hero_type_count) {
+            printf("That hero does not exist.\n");
+        } else if (selection == excludeId) {
+            printf("You cannot select that hero.\n");
+        } else {
+            return selection;
+        }
+    } while (1);
+}
+
 void handleHeroSelection(struct player *player) {
-    player->hero1.type = &hero_types[hero_type_knight];
-    player->hero2.type = &hero_types[hero_type_archer];
+    int sel1 = selectHero(-1);
+    int sel2 = selectHero(sel1);
+    player->hero1.type = &hero_types[sel1];
+    player->hero2.type = &hero_types[sel2];
     initHero(&player->hero1);
     initHero(&player->hero2);
 }
@@ -456,7 +477,9 @@ void handleHeroSelection(struct player *player) {
 int main() {
     wheels_init();
     reset();
+    printf("Player 1 Hero Selection\n");
     handleHeroSelection(&player1);
+    printf("Player 2 Hero Selection\n");
     handleHeroSelection(&player2);
     return runGameLoop();
 }
