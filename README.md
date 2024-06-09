@@ -1,11 +1,3 @@
-# Wheels from Sea of Stars in C
-
-- Step 1:  
-  Basic Game in a single file as terminal app.  
-  Bronze Wheel
-  Knight, Archer
-  
-- Step 2:
-  Improve Controls
-  Modular Heroes: Mage, Assassin; Hero matrix? for order of Heros
-  
+# SoS-Wheels
+Remaking the Wheels table game from [Sea of Stars](https://seaofstarsgame.co/).  
+I am using the language C because I want to learn it and I know it's probably "sub-optimal".  
