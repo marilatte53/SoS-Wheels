@@ -1,3 +1,16 @@
 # SoS-Wheels
+
 Remaking the Wheels table game from [Sea of Stars](https://seaofstarsgame.co/).  
-I am using the language C because I want to learn it and I know it's probably "sub-optimal".  
+I am using the language C because I want to, I know it's probably "sub-optimal" or whatever.
+
+The game is currently not very user-friendly. I will eventually fix that but first I want to get the
+actual game to work.
+
+## TODO List
+
+- Put hero base stats in hero_info
+- Change Hero stats depending on tier
+- Hero selection menu
+- Mage
+- Improve user input, give feedback to user
+- Help menu
