@@ -11,6 +11,7 @@ actual game to work.
 - [X] Change Hero stats depending on tier
 - [X] Hero selection menu
 - [X] Mage
+- [ ] Hero Names & Description
 - [ ] Improve user input, give feedback to user
 - [ ] Help menu
 - [ ] Adjust wheel chances

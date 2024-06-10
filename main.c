@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include "io.h"
 
 #define PLAYER_WALL_MAX 5
 
@@ -76,6 +77,10 @@ struct hero_type {
 
     void (*attack)(struct hero *hero, struct player *attacker, struct player *defender);
 };
+
+char *hero_type_getName(struct hero_type *type) {
+    return "Hero Name";
+}
 
 int hero_getDamageWall(struct hero *hero) {
     return hero->type->damageWall[hero->tier];
@@ -253,8 +258,6 @@ void printStatus() {
     if (game.player_turn == 1)
         printf("*");
     printf("\n");
-
-    fflush(stdout);
 }
 
 int isWheelFullyLocked(const int wheel[5]) {
@@ -482,16 +485,103 @@ int selectHero(int excludeId) {
     } while (1);
 }
 
+/**
+ * Print text and fill with whitespace to the right
+ */
+void printSpaceR(char *text, unsigned int whiteFill) {
+    unsigned int nWhite = whiteFill - strlen(text);
+    printf("%s%*c", text, nWhite, ' ');
+}
+
+void printIntArray(unsigned int count, int val[count]) {
+    for (unsigned int i = 0; i < count; i++) {
+        printf("%d  ", val[i]);
+    }
+}
+
+void hero_type_printInfo(struct hero_type *type) {
+    printf("Hero %d\n", type->id); // Name
+    // Tiers
+    printf("Tier        ");
+    for (int i = 0; i < HERO_TIERS_COUNT; i++) {
+        printf("  %d", i + 1);
+    }
+    printf("\n");
+    printSpaceR("Max Energy", 14);
+    printIntArray(HERO_TIERS_COUNT, type->maxEnergy);
+    printf("\n");
+    printSpaceR("Crown Damage", 14);
+    printIntArray(HERO_TIERS_COUNT, type->damageCrown);
+    printf("\n");
+    printSpaceR("Wall Damage", 14);
+    printIntArray(HERO_TIERS_COUNT, type->damageWall);
+    printf("\n");
+    printSpaceR("Description", 14);
+    printf("Hero Description here");
+    printf("\n");
+}
+
+// See doc/heroSelect.txt
 void handleHeroSelection(struct player *player) {
-    int sel1 = selectHero(-1);
-    int sel2 = selectHero(sel1);
-    player->hero1.type = &hero_types[sel1];
-    player->hero2.type = &hero_types[sel2];
-    initHero(&player->hero1);
-    initHero(&player->hero2);
+    int confirm1 = 0, confirm2 = 0;
+    do {
+        for (int i = 0; i < hero_type_count; i++) {
+            char buf[20];
+            snprintf(buf, 20, "[%d] %s", i, hero_type_getName(hero_types + i));
+            printSpaceR(buf, 14);
+            if (player->hero1.type == hero_types + i) {
+                printf("< 1");
+            } else if (player->hero2.type == hero_types + i) {
+                printf("< 2");
+            }
+            printf("\n");
+        }
+        // Print hero type stats
+        if (confirm1 && player->hero2.type != NULL) {
+            printf("\n");
+            hero_type_printInfo(player->hero2.type);
+        } else if (player->hero1.type != NULL) {
+            printf("\n");
+            hero_type_printInfo(player->hero1.type);
+        }
+        // Prompt
+        if (player->hero1.type == NULL) {
+            printf("\nSelect your first Hero [0-%d]\n>", hero_type_count - 1);
+        } else if (confirm1 && player->hero2.type == NULL) {
+            printf("\nSelect your second Hero [0-%d]\n>", hero_type_count - 1);
+        } else {
+            printf("\nEnter [y]es to confirm or select another Hero [0-2]\n>");
+        }
+        // Handle input
+        char input = getchar();
+        consumeLine();
+        short inputYes = (input == 'y' || input == 'Y');
+        // When second Hero is selected, player may confirm 
+        if (player->hero2.type != NULL && inputYes) {
+            confirm2 = 1;
+        } else if (!confirm1 && player->hero1.type != NULL && inputYes) {
+            // When first Hero is selected, but not yet confirmed, player may confirm
+            confirm1 = 1;
+        } else {
+            // Otherwise select
+            int numChoice = input - '0';
+            if (numChoice < 0 || numChoice >= hero_type_count) {
+                printf("That Hero does not exist\n");
+            } else if (confirm1) {
+                if (player->hero1.type == hero_types + numChoice) {
+                    printf("You have already selected %s\n",
+                           hero_type_getName(hero_types + numChoice));
+                } else
+                    player->hero2.type = hero_types + numChoice;
+            } else
+                player->hero1.type = hero_types + numChoice;
+        }
+        printf("\n");
+    } while (!confirm1 || !confirm2);
 }
 
 int main() {
+    setbuf(stdout, 0);
     wheels_init();
     reset();
     printf("Player 1 Hero Selection\n");
