@@ -71,6 +71,8 @@ struct player {
 
 struct hero_type {
     enum hero_type_id id;
+    char *name;
+    char *description;
     int maxEnergy[HERO_TIERS_COUNT];
     int damageCrown[HERO_TIERS_COUNT];
     int damageWall[HERO_TIERS_COUNT];
@@ -79,7 +81,7 @@ struct hero_type {
 };
 
 char *hero_type_getName(struct hero_type *type) {
-    return "Hero Name";
+    return type->name;
 }
 
 int hero_getDamageWall(struct hero *hero) {
@@ -128,6 +130,8 @@ void wheels_init() {
     srand(time(NULL));
     hero_types[hero_type_knight] = (struct hero_type) {
             .id = hero_type_knight,
+            .name = "Knight",
+            .description = "If the opponent has a Wall, attacks the Wall. Otherwise attacks the Crown.",
             .maxEnergy = {3, 3, 3},
             .damageCrown = {3, 5, 7},
             .damageWall = {3, 5, 5},
@@ -135,6 +139,8 @@ void wheels_init() {
     };
     hero_types[hero_type_archer] = (struct hero_type) {
             .id = hero_type_archer,
+            .name = "Archer",
+            .description = "Can shoot over Walls that are at most 2 high.",
             .maxEnergy = {4, 3, 3},
             .damageCrown = {3, 4, 6},
             .damageWall = {1, 2, 3},
@@ -142,6 +148,8 @@ void wheels_init() {
     };
     hero_types[hero_type_mage] = (struct hero_type) {
             .id = hero_type_mage,
+            .name = "Mage",
+            .description = "Attacks twice. Second attack ignores Walls.",
             .maxEnergy = {5, 4, 4},
             .damageCrown = {3, 3, 3},
             .damageWall = {1, 3, 5},
@@ -210,10 +218,12 @@ void printStatus() {
     if (game.player_turn == 2)
         printf("*");
     printf("\n");
-    printf("     Hero  %d      ", player2.hero1.type->id);
+    printf("  ");
+    printSpaceL(player2.hero1.type->name, 7);
+    printf("         ");
     formatWheelSlots(centerStrBuf, player2.wheel);
     printf("%s", centerStrBuf);
-    printf("      %d  Hero\n", player2.hero2.type->id);
+    printf("         %s\n", player2.hero2.type->name);
 
     printf("   Energy %d/%d     ", player2.hero1.energy, hero_getMaxEnergy(&player2.hero1));
     memset(centerStrBuf, ' ', 14);
@@ -249,11 +259,13 @@ void printStatus() {
     formatWheelLock(centerStrBuf, player1.wheel);
     printf("%s", centerStrBuf);
     printf("     %d/%d Energy\n", player1.hero2.energy, hero_getMaxEnergy(&player1.hero2));
-    printf("     Hero  %d      ", player1.hero1.type->id);
+    printf("  ");
+    printSpaceL(player1.hero1.type->name, 7);
+    printf("         ");
     memset(centerStrBuf, ' ', 14);
     formatWheelSlots(centerStrBuf, player1.wheel);
     printf("%s", centerStrBuf);
-    printf("      %d  Hero\n", player1.hero2.type->id);
+    printf("         %s\n", player1.hero2.type->name);
     printf("                     Player 1");
     if (game.player_turn == 1)
         printf("*");
@@ -485,22 +497,8 @@ int selectHero(int excludeId) {
     } while (1);
 }
 
-/**
- * Print text and fill with whitespace to the right
- */
-void printSpaceR(char *text, unsigned int whiteFill) {
-    unsigned int nWhite = whiteFill - strlen(text);
-    printf("%s%*c", text, nWhite, ' ');
-}
-
-void printIntArray(unsigned int count, int val[count]) {
-    for (unsigned int i = 0; i < count; i++) {
-        printf("%d  ", val[i]);
-    }
-}
-
 void hero_type_printInfo(struct hero_type *type) {
-    printf("Hero %d\n", type->id); // Name
+    printf("%s\n", hero_type_getName(type)); // Name
     // Tiers
     printf("Tier        ");
     for (int i = 0; i < HERO_TIERS_COUNT; i++) {
@@ -517,8 +515,7 @@ void hero_type_printInfo(struct hero_type *type) {
     printIntArray(HERO_TIERS_COUNT, type->damageWall);
     printf("\n");
     printSpaceR("Description", 14);
-    printf("Hero Description here");
-    printf("\n");
+    printf("%s\n", type->description);
 }
 
 // See doc/heroSelect.txt

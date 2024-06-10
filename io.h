@@ -7,4 +7,9 @@
 
 void consumeLine();
 
+void printSpaceL(char *text, unsigned int whiteFill);
+void printSpaceR(char *text, unsigned int whiteFill);
+
+void printIntArray(unsigned int count, int val[count]);
+
 #endif //IO_H
