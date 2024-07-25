@@ -96,7 +96,12 @@ int hero_getMaxEnergy(struct hero *hero) {
 }
 
 void hero_attack(struct hero *hero, struct player *attacker, struct player *defender) {
+    printf("%s: Regular Attack\n", hero_type_getName(hero->type));
+    int oldHp = defender->hp;
+    int oldWall = defender->wall;
     hero->type->attack(hero, attacker, defender);
+    printf("HP %d->%d\n", oldHp, defender->hp);
+    printf("Wall %d->%d\n", oldWall, defender->wall);
 }
 
 struct hero_type hero_types[hero_type_count];
@@ -322,11 +327,17 @@ void updateHeroTier(struct hero *hero) {
     if (hero->xp >= HERO_XP_MAX && hero->tier < 3) {
         hero->tier++;
         hero->xp = 0;
+        printf("+");
+    } else {
+        printf("=");
     }
+    printf("%d\n", hero->tier);
 }
 
 void updateHeroTiers(struct player *player) {
+    printf("Hero L ");
     updateHeroTier(&player->hero1);
+    printf("Hero R ");
     updateHeroTier(&player->hero2);
 }
 
@@ -343,6 +354,8 @@ void assignWheelXp(struct player *player) {
     }
     player->hero1.xp += squareXp;
     player->hero2.xp += diamondXp;
+    printf("Hero L +%d\n", squareXp);
+    printf("Hero R +%d\n", diamondXp);
 }
 
 void buildWall(struct player *player) {
@@ -352,13 +365,27 @@ void buildWall(struct player *player) {
         if (BITS_SET(side, SIDE_HAMMER_MASK))
             hammers += side & SIDE_HAMMER_VALUE_MASK;
     }
-    if (hammers > 2)
+    
+    printf("%d", player->wall);
+    if (hammers > 2) {
         player->wall += hammers - 2;
+        printf(" + %d ", hammers - 2);
+    }
     if (player->wall > PLAYER_WALL_MAX)
         player->wall = PLAYER_WALL_MAX;
+    printf(" = %d\n", player->wall);
 }
 
-void assignHeroEnergy(struct player *player) {
+void subHeroEnergy(struct hero *hero, int energy) {
+    printf(" %d", hero->energy);
+    if (energy > 2) {
+        hero->energy -= (energy - 2);
+        printf(" - %d", (energy - 2));
+    }
+    printf(" = %d\n", hero->energy);
+}
+
+void calcAndSubHeroEnergy(struct player *player) {
     int diamondEnergy = 0, squareEnergy = 0;
     for (size_t i = 0; i < 5; i++) {
         int side = getWheelSideValue(player->wheel[i]);
@@ -367,10 +394,10 @@ void assignHeroEnergy(struct player *player) {
         else if (BITS_SET(side, SIDE_SQUARE_MASK))
             squareEnergy += side & SIDE_SQUARE_VALUE_MASK;
     }
-    if (squareEnergy > 2)
-        player->hero1.energy -= (squareEnergy - 2);
-    if (diamondEnergy > 2)
-        player->hero2.energy -= (diamondEnergy - 2);
+    printf("Hero L");
+    subHeroEnergy(&player->hero1, squareEnergy);
+    printf("Hero R");
+    subHeroEnergy(&player->hero2, diamondEnergy);
 }
 
 void tryHeroAttack(struct hero *hero, struct player *attacker, struct player *defender,
@@ -385,6 +412,8 @@ void tryHeroAttack(struct hero *hero, struct player *attacker, struct player *de
     }
     // Bomb attack
     if (hero->xp >= HERO_XP_MAX && hero->tier == HERO_TIERS_COUNT) {
+        printf("%s: Bomb Attack\n", hero_type_getName(hero->type));
+        printf("-2 HP\n");
         defender->hp -= 2;
         hero->xp = 0;
     }
@@ -414,21 +443,31 @@ void handleAttacks() {
 // TODO: add logs
 void playRound() {
     // assign XP
+    printf("# Player 1 XP\n");
     assignWheelXp(&player1);
+    printf("# Player 2 XP\n");
     assignWheelXp(&player2);
     // Update Tiers
+    printf("# Player 1 Hero Tiers\n");
     updateHeroTiers(&player1);
+    printf("# Player 2 Hero Tiers\n");
     updateHeroTiers(&player2);
     // build wall
+    printf("# Player 1 Wall\n");
     buildWall(&player1);
+    printf("# Player 2 Wall\n");
     buildWall(&player2);
     // assign energy
-    assignHeroEnergy(&player1);
-    assignHeroEnergy(&player2);
+    printf("# Player 1 Hero Energy\n");
+    calcAndSubHeroEnergy(&player1);
+    printf("# Player 2 Hero Energy\n");
+    calcAndSubHeroEnergy(&player2);
     // attack: knight, archer + bomb attack
     handleAttacks();
     // Update Tiers again
+    printf("# Player 1 Hero Tiers\n");
     updateHeroTiers(&player1);
+    printf("# Player 2 Hero Tiers\n");
     updateHeroTiers(&player2);
 }
 
@@ -482,7 +521,7 @@ int runGameLoop() {
             player_won = 2;
         }
     } while (!player_won);
-    
+
     if (player_won == 1) {
         printf("Player 1 wins!\n");
     } else if (player_won == 2) {

@@ -12,7 +12,8 @@ actual game to work.
 - [X] Hero selection menu
 - [X] Mage
 - [X] Hero Names & Description
-- [ ] Improve user input, give feedback to user
+- [X] Improve user input, give feedback to user
+- [ ] Round log
 - [ ] Check Energy on Hero Tier Up
 - [ ] Help menu
 - [ ] Adjust wheel chances
