@@ -13,6 +13,7 @@ actual game to work.
 - [X] Mage
 - [X] Hero Names & Description
 - [ ] Improve user input, give feedback to user
+- [ ] Check Energy on Hero Tier Up
 - [ ] Help menu
 - [ ] Adjust wheel chances
 - [ ] Other wheels

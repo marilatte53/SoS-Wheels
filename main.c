@@ -37,7 +37,6 @@ struct hero {
 #define SIDE_HAMMER_MASK (1 << 5)
 #define SIDE_HAMMER_VALUE_MASK 3
 
-// TODO: use union or something
 enum wheel_side {
     wheel_side_empty = 0,
     diamond1 = SIDE_DIAMOND_MASK + 1,
@@ -157,19 +156,8 @@ void wheels_init() {
     };
 }
 
-void initHero(struct hero *hero) {
+void initHeroFromType(struct hero *hero) {
     hero->energy = hero->type->maxEnergy[0];
-    hero->tier = 0;
-    hero->xp = 0;
-}
-
-void reset() {
-    player1.hp = 10;
-    player1.wall = 0;
-    // player1.wheel should be all zero
-
-    // Copy player 1
-    player2 = player1;
 }
 
 int getWheelSideValue(int slot) {
@@ -208,7 +196,6 @@ void formatWheelSlots(char buf[14], int wheel[5]) {
     }
 }
 
-// TODO: Hero names
 void printStatus() {
     char centerStrBuf[15];
     memset(centerStrBuf, ' ', 14);
@@ -219,7 +206,7 @@ void printStatus() {
         printf("*");
     printf("\n");
     printf("  ");
-    printSpaceL(player2.hero1.type->name, 7);
+    printSpaceR(player2.hero1.type->name, 7);
     printf("         ");
     formatWheelSlots(centerStrBuf, player2.wheel);
     printf("%s", centerStrBuf);
@@ -260,7 +247,7 @@ void printStatus() {
     printf("%s", centerStrBuf);
     printf("     %d/%d Energy\n", player1.hero2.energy, hero_getMaxEnergy(&player1.hero2));
     printf("  ");
-    printSpaceL(player1.hero1.type->name, 7);
+    printSpaceR(player1.hero1.type->name, 7);
     printf("         ");
     memset(centerStrBuf, ' ', 14);
     formatWheelSlots(centerStrBuf, player1.wheel);
@@ -281,39 +268,48 @@ int isWheelFullyLocked(const int wheel[5]) {
 }
 
 int handlePlayerTurn(int wheel[5]) {
-    int turnsLeft = 3;
+    int spinsLeft = 3;
     do {
+        // TODO: press h for help
         printStatus();
-        printf("> ");
-        int input = getchar();
-        printf("\n");
-        printf("%d\n", getchar());
-        // Check forfeit
-        if (input == 'f') {
-            return 1;
+        char *line = promptLine();
+        char first = line[0];
+        if (first == 'f') {
+            return 1; // Forfeit
         }
-        // Player wants to (un)lock wheel; They can't do so on the first turn
-        if (turnsLeft < 3 && input <= '5' && input > '0') {
-            // Toggle wheel lock
-            wheel[(input - '1')] ^= 1 << 30;
-        } else if (input == 'e') {
+        // First spin: Only possible move is spin
+        if (spinsLeft == 3 && first != 'e')
+            continue;
+        if (first == 's') // Skip rest of turn
+            break;
+        // Process side inputs
+        int sideLock[5] = {0};
+        int lineI = 0;
+        char c;
+        while ((c = line[lineI]) > '0' && c < '6' && lineI < I_LINEBUF_LEN) {
+            sideLock[c - '0'] = 1;
+            lineI++;
+        }
+        for (short i = 0; i < 5; i++) {
+            wheel[i] ^= sideLock[i] << 30;
+        }
+        // Spin
+        if (line[lineI] == 'e') {
             // handle fully locked wheel
             if (isWheelFullyLocked(wheel)) {
                 break;
-            } else {
-                // Spin wheel
-                for (int i = 0; i < 5; i++) {
-                    // If locked, skip slot
-                    if (wheel[i] & (1 << 30))
-                        continue;
-                    int side = rand() % WHEEL_BRONZE_SIDES;
-                    // Reset the slot first and then set the side
-                    wheel[i] = (wheel[i] & ~((1 << 30) - 1)) | bronze_wheel[side];
-                }
-                turnsLeft--;
             }
+            // Spin wheel
+            for (int i = 0; i < 5; i++) {
+                // If locked, skip slot
+                if (wheel[i] & (1 << 30))
+                    continue;
+                // Wheel can't be locked here
+                wheel[i] = bronze_wheel[(rand() % WHEEL_BRONZE_SIDES)];
+            }
+            spinsLeft--;
         }
-    } while (turnsLeft > 0);
+    } while (spinsLeft > 0);
     // Unlock wheel
     for (int i = 0; i < 5; i++) {
         wheel[i] &= ~(1 << 30);
@@ -435,6 +431,25 @@ void playRound() {
     updateHeroTiers(&player2);
 }
 
+void resetHero(struct hero *hero) {
+    hero->type = 0;
+    hero->tier = 0;
+    hero->xp = 0;
+}
+
+void wheels_reset() {
+    player1.hp = 10;
+    player1.wall = 0;
+    memset(player1.wheel, 0, sizeof(int) * 5);
+
+    // Copy player 1
+    player2 = player1;
+    resetHero(&player1.hero1);
+    resetHero(&player1.hero2);
+    resetHero(&player2.hero1);
+    resetHero(&player2.hero2);
+}
+
 int runGameLoop() {
     int player_won = 0;
     do {
@@ -476,111 +491,82 @@ int runGameLoop() {
     return 0;
 }
 
-int selectHero(int excludeId) {
-    do {
-        for (int i = 0; i < hero_type_count; i++) {
-            if (excludeId != hero_types[i].id)
-                printf("%d ", hero_types[i].id);
-        }
-        printf("\nSelect a hero\n>");
-        char choice = getchar();
-        getchar();
-        printf("\n");
-        int selection = choice - '0';
-        if (selection < 0 || selection >= hero_type_count) {
-            printf("That hero does not exist.\n");
-        } else if (selection == excludeId) {
-            printf("You cannot select that hero.\n");
-        } else {
-            return selection;
-        }
-    } while (1);
-}
-
 void hero_type_printInfo(struct hero_type *type) {
-    printf("%s\n", hero_type_getName(type)); // Name
+    printf("[%d] %s\n", (int) (type - hero_types), hero_type_getName(type)); // Name
     // Tiers
     printf("Tier        ");
     for (int i = 0; i < HERO_TIERS_COUNT; i++) {
         printf("  %d", i + 1);
     }
     printf("\n");
-    printSpaceR("Max Energy", 14);
+    printSpaceL("Max Energy", 14);
     printIntArray(HERO_TIERS_COUNT, type->maxEnergy);
     printf("\n");
-    printSpaceR("Crown Damage", 14);
+    printSpaceL("Crown Damage", 14);
     printIntArray(HERO_TIERS_COUNT, type->damageCrown);
     printf("\n");
-    printSpaceR("Wall Damage", 14);
+    printSpaceL("Wall Damage", 14);
     printIntArray(HERO_TIERS_COUNT, type->damageWall);
     printf("\n");
-    printSpaceR("Description", 14);
+    printSpaceL("Description", 14);
     printf("%s\n", type->description);
 }
 
-// See doc/heroSelect.txt
+int getActHeroSel(char cSel) {
+    int actSel = cSel - '0';
+    int minSel = 0;
+    int maxSel = hero_type_count - 1;
+    if (actSel < minSel || actSel > maxSel) {
+        return -1;
+    }
+    return actSel;
+}
+
 void handleHeroSelection(struct player *player) {
-    int confirm1 = 0, confirm2 = 0;
     do {
+        // Print hero names
         for (int i = 0; i < hero_type_count; i++) {
             char buf[20];
             snprintf(buf, 20, "[%d] %s", i, hero_type_getName(hero_types + i));
-            printSpaceR(buf, 14);
-            if (player->hero1.type == hero_types + i) {
-                printf("< 1");
-            } else if (player->hero2.type == hero_types + i) {
-                printf("< 2");
-            }
+            printSpaceL(buf, 14);
             printf("\n");
         }
-        // Print hero type stats
-        if (confirm1 && player->hero2.type != NULL) {
-            printf("\n");
-            hero_type_printInfo(player->hero2.type);
-        } else if (player->hero1.type != NULL) {
+
+        if (player->hero1.type == NULL) {
+            printf("Choose your heroes! (enter two numbers [0-%d])\n", hero_type_count - 1);
+        } else {
             printf("\n");
             hero_type_printInfo(player->hero1.type);
+            printf("\n");
+            hero_type_printInfo(player->hero2.type);
+            printf("\n");
+            printf("Enter [y]es to confirm your current selection\n");
+            printf("Or change your heroes (enter two numbers [0-%d])\n", hero_type_count - 1);
         }
-        // Prompt
-        if (player->hero1.type == NULL) {
-            printf("\nSelect your first Hero [0-%d]\n>", hero_type_count - 1);
-        } else if (confirm1 && player->hero2.type == NULL) {
-            printf("\nSelect your second Hero [0-%d]\n>", hero_type_count - 1);
-        } else {
-            printf("\nEnter [y]es to confirm or select another Hero [0-2]\n>");
-        }
-        // Handle input
-        char input = getchar();
-        consumeLine();
-        short inputYes = (input == 'y' || input == 'Y');
-        // When second Hero is selected, player may confirm 
-        if (player->hero2.type != NULL && inputYes) {
-            confirm2 = 1;
-        } else if (!confirm1 && player->hero1.type != NULL && inputYes) {
-            // When first Hero is selected, but not yet confirmed, player may confirm
-            confirm1 = 1;
-        } else {
-            // Otherwise select
-            int numChoice = input - '0';
-            if (numChoice < 0 || numChoice >= hero_type_count) {
-                printf("That Hero does not exist\n");
-            } else if (confirm1) {
-                if (player->hero1.type == hero_types + numChoice) {
-                    printf("You have already selected %s\n",
-                           hero_type_getName(hero_types + numChoice));
-                } else
-                    player->hero2.type = hero_types + numChoice;
-            } else
-                player->hero1.type = hero_types + numChoice;
-        }
+
+        char *line = promptLine();
         printf("\n");
-    } while (!confirm1 || !confirm2);
+        // Confirm selection
+        if ((line[0] == 'y' || line[0] == 'Y') && player->hero1.type != NULL) {
+            break;
+        }
+        int sel1 = getActHeroSel(line[0]);
+        int sel2 = getActHeroSel(line[1]);
+        if (sel1 != -1 && sel2 != -1) {
+            player->hero1.type = hero_types + sel1;
+            player->hero2.type = hero_types + sel2;
+        } else {
+            printf("Invalid selection.\n");
+        }
+    } while (1);
+    initHeroFromType(&player->hero1);
+    initHeroFromType(&player->hero2);
 }
 
 int main() {
     setbuf(stdout, 0);
     wheels_init();
-    reset();
+    wheels_reset();
     printf("Player 1 Hero Selection\n");
     handleHeroSelection(&player1);
     printf("Player 2 Hero Selection\n");
