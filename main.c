@@ -286,7 +286,7 @@ int handlePlayerTurn(int wheel[5]) {
         int sideLock[5] = {0};
         int lineI = 0;
         char c;
-        while ((c = line[lineI]) > '0' && c < '6' && lineI < I_LINEBUF_LEN) {
+        while ((c = line[lineI]) >= '0' && c < '5' && lineI < I_LINEBUF_LEN) {
             sideLock[c - '0'] = 1;
             lineI++;
         }
@@ -304,7 +304,7 @@ int handlePlayerTurn(int wheel[5]) {
                 // If locked, skip slot
                 if (wheel[i] & (1 << 30))
                     continue;
-                // Wheel can't be locked here
+                // Slot is not locked
                 wheel[i] = bronze_wheel[(rand() % WHEEL_BRONZE_SIDES)];
             }
             spinsLeft--;
@@ -411,6 +411,7 @@ void handleAttacks() {
     fixPlayerStats(&player2);
 }
 
+// TODO: add logs
 void playRound() {
     // assign XP
     assignWheelXp(&player1);
@@ -470,6 +471,7 @@ int runGameLoop() {
             break;
         }
         playRound();
+        printf("\n");
         printStatus();
         // check game end
         if (player1.hp == 0 && player2.hp == 0) {
@@ -480,7 +482,7 @@ int runGameLoop() {
             player_won = 2;
         }
     } while (!player_won);
-    // Win screen
+    
     if (player_won == 1) {
         printf("Player 1 wins!\n");
     } else if (player_won == 2) {

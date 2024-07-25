@@ -4,7 +4,7 @@ e = Spin Wheel
 s = Lock all and Spin = Skip rest of turn
 [1-5] = Toggle Wheel Slot lock
 
-The options f and s must be the first character and after reading these, the rest of the Line will be discarded.
+The options f and s must be the first character and after reading these, the rest of the line will be discarded.
 
 The Wheel cannot be toggled before the first spin.
 When locking the Wheel, the player may input multiple Slots, they will be processed one after the other.
